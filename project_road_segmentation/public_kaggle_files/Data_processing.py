@@ -6,16 +6,29 @@ import os, sys
 from PIL import Image
 import cv2
 import re
+import torch
+
+def accuracy(img1,img2):
+   acc=np.sum(img1==img2)/len(img1)
+   return acc
 
 def load_image(infilename):
     #load the image
     data = mpimg.imread(infilename)
     return data
 
+def normalize_images(imgs):
+    #normalize the images
+    return [img for img in imgs]
+
 def img_float_to_uint8(img):
     #convert the image to uint8
-    rimg = img - np.min(img)
-    rimg = (rimg / np.max(rimg) * 255).round().astype(np.uint8)
+    if hasattr(img, 'numpy'):  # 如果是PyTorch Tensor
+        rimg = img - img.min()
+        rimg = (rimg / rimg.max()).round().to(torch.uint8)
+    else:  # 如果是NumPy数组
+        rimg = img - np.min(img)
+        rimg = (rimg / np.max(rimg)).round().astype(np.uint8)
     return rimg
 
 def img_crop(im, w, h):
@@ -133,6 +146,17 @@ def mask_to_submission_strings(image_filename):
             label = patch_to_label(patch)
             yield ("{:03d}_{}_{},{}".format(img_number, j, i, label))
 
+def mask_to_submission_strings1(image_filename):
+    """Reads a single image and outputs the strings that should go into the submission file"""
+    img_number = int(re.search(r"\d+", image_filename).group(0))
+    im = mpimg.imread(image_filename)
+    im=im/255
+    patch_size = 16
+    for j in range(0, im.shape[1], patch_size):
+        for i in range(0, im.shape[0], patch_size):
+            patch = im[i : i + patch_size, j : j + patch_size]
+            label = patch_to_label(patch)
+            yield ("{:03d}_{}_{},{}".format(img_number, j, i, label))
 
 def masks_to_submission(submission_filename, *image_filenames,csv_filename):
     """Converts images into a submission file"""
@@ -148,3 +172,33 @@ def patch_to_label(patch):
         return 1
     else:
         return 0
+
+def img_transform(img):
+    # after FCN, the image has too high frequency, we need to smooth it,the size is 608*608 and is Gray
+    img=cv2.GaussianBlur(img,(5,5),0)
+    return img
+
+def croped_img(gt_imgs):
+    #convert the 608*608 image to 16*16 image
+    new_gt_imgs=[]
+    for img in gt_imgs:
+        w,h=img.shape
+        new_img=np.zeros((w//16,h//16))
+        for i in range(0,w,16):
+            for j in range(0,h,16):
+                patch=img[i:i+16,j:j+16]
+                new_img[i//16,j//16]=patch_to_label(patch)
+        new_gt_imgs.append(new_img)
+    return new_gt_imgs
+
+def mirror_image(img):
+    #mirror the image
+    img=np.flip(img)
+    return img
+
+def rotate_image(img):
+    #rotate the image 90 degrees
+    img=np.rot90(img)
+    return img
+
+

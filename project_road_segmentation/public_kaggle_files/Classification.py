@@ -196,7 +196,7 @@ def train_FCN8s(X_batch,Y_batch):
     model=FCN8s()
     criterion=torch.nn.CrossEntropyLoss()
     optimizer=torch.optim.Adam(model.parameters(),lr=0.001)
-    for epoch in range(1):
+    for epoch in range(4):
         for i in range(len(X_batch)):
             optimizer.zero_grad()
             output=model(X_batch[i])
@@ -205,6 +205,225 @@ def train_FCN8s(X_batch,Y_batch):
             optimizer.step()
     return model
 
-        
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-        
+class FCNPatchClassifier(nn.Module):
+    def __init__(self):
+        super(FCNPatchClassifier, self).__init__()
+
+        self.block1 = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # 304x304
+        )
+
+        self.block2 = nn.Sequential(
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.Conv2d(128, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # 152x152
+        )
+
+        self.block3 = nn.Sequential(
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # 76x76
+        )
+
+        self.block4 = nn.Sequential(
+            nn.Conv2d(256, 512, kernel_size=3, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.Conv2d(512, 512, kernel_size=3, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.Conv2d(512, 512, kernel_size=3, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # 38x38
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Conv2d(512, 1024, kernel_size=3, padding=1),
+            nn.BatchNorm2d(1024),
+            nn.ReLU(),
+            nn.Conv2d(1024, 2, kernel_size=1)  # 输出每个 patch 的 2 类得分（不上采样）
+        )
+
+    def forward(self, x):
+        # x: (B, 608, 608, 3) → permute to (B, 3, 608, 608)
+        x = x.permute(0, 3, 1, 2)
+
+        x = self.block1(x)  # → 304x304
+        x = self.block2(x)  # → 152x152
+        x = self.block3(x)  # → 76x76
+        x = self.block4(x)  # → 38x38
+        x = self.classifier(x)  # → (B, 2, 38, 38)
+
+        return x
+
+# 训练函数
+def train_FCN_PatchClassifier(X_batch, Y_batch, num_epochs=4):
+    model = FCNPatchClassifier()
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+    model.train()
+    for epoch in range(num_epochs):
+        for i in range(len(X_batch)):
+            optimizer.zero_grad()
+            output = model(X_batch[i])  # (1, 3, 608, 608)
+            loss = criterion(output, Y_batch[i])  # Y: (1, 38, 38)
+            loss.backward()
+            optimizer.step()
+            print(f"Epoch {epoch}, Sample {i}, Loss: {loss.item():.4f}")
+
+    return model
+
+
+class FCN8sPatchClassifier_complex(nn.Module):
+    def __init__(self):
+        super(FCN8sPatchClassifier_complex, self).__init__()
+
+        # Feature Extractor (类似 VGG16)
+        self.block1 = nn.Sequential(
+            nn.Conv2d(3, 64, 3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, 3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # 608 -> 304
+        )
+        self.block2 = nn.Sequential(
+            nn.Conv2d(64, 128, 3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.Conv2d(128, 128, 3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # 304 -> 152
+        )
+        self.block3 = nn.Sequential(
+            nn.Conv2d(128, 256, 3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.Conv2d(256, 256, 3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.Conv2d(256, 256, 3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # 152 -> 76
+        )
+        self.block4 = nn.Sequential(
+            nn.Conv2d(256, 512, 3, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.Conv2d(512, 512, 3, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.Conv2d(512, 512, 3, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # 76 -> 38
+        )
+        self.block5 = nn.Sequential(
+            nn.Conv2d(512, 512, 3, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.Conv2d(512, 512, 3, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.Conv2d(512, 512, 3, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # 38 -> 19
+        )
+
+        # Classifier layers (FC → conv)
+        self.classifier = nn.Sequential(
+            nn.Conv2d(512, 4096, kernel_size=7, padding=3),  # 19x19
+            nn.ReLU(),
+            nn.Dropout2d(),
+            nn.Conv2d(4096, 4096, kernel_size=1),
+            nn.ReLU(),
+            nn.Dropout2d(),
+            nn.Conv2d(4096, 2, kernel_size=1)  # 输出通道 = 类别数
+        )
+
+        # Skip layers (score)
+        self.score_pool4 = nn.Conv2d(512, 2, kernel_size=1)
+        self.score_pool3 = nn.Conv2d(256, 2, kernel_size=1)
+
+        # Upsample layers
+        self.upscore2 = nn.ConvTranspose2d(2, 2, kernel_size=4, stride=2, padding=1, bias=False)  # 19 → 38
+        self.upscore4 = nn.ConvTranspose2d(2, 2, kernel_size=4, stride=2, padding=1, bias=False)  # 38 → 76
+        self.upscore8 = nn.ConvTranspose2d(2, 2, kernel_size=8, stride=8, padding=0, bias=False)  # 76 → 608
+
+    def forward(self, x):
+        # Input: (B, 608, 608, 3)
+        x = x.permute(0, 3, 1, 2)  # → (B, 3, 608, 608)
+
+        x1 = self.block1(x)  # 304x304
+        x2 = self.block2(x1)  # 152x152
+        x3 = self.block3(x2)  # 76x76 → for skip3
+        x4 = self.block4(x3)  # 38x38 → for skip4
+        x5 = self.block5(x4)  # 19x19
+
+        score = self.classifier(x5)  # (B, 2, 19, 19)
+        score = self.upscore2(score)  # (B, 2, 38, 38)
+
+        score4 = self.score_pool4(x4)  # (B, 2, 38, 38)
+        score = score + score4
+
+        score = self.upscore4(score)  # (B, 2, 76, 76)
+        score3 = self.score_pool3(x3)  # (B, 2, 76, 76)
+        score = score + score3
+
+        score = self.upscore8(score)  # (B, 2, 608, 608)
+
+        # 最后 reshape 到每个 16x16 patch 输出一个值
+        # (B, 2, 608, 608) → (B, 2, 38, 38) 通过 pooling
+        output = F.adaptive_avg_pool2d(score, (38, 38))  # 平均池化代替明确切块分类
+
+        return output
+
+def train_fcn8s_patch(X_batch, Y_batch, num_epochs=4):
+    model = FCN8sPatchClassifier_complex()
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+    model.train()
+    for epoch in range(num_epochs):
+        total_loss = 0
+        for i in range(len(X_batch)):
+            x = X_batch[i]  # (1, 608, 608, 3)
+            y = Y_batch[i]  # (1, 38, 38)
+
+            optimizer.zero_grad()
+            output = model(x)  # (1, 2, 38, 38)
+            loss = criterion(output, y)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+
+        print(f"Epoch {epoch+1}/{num_epochs}, Loss: {total_loss:.4f}")
+
+    return model
