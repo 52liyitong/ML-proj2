@@ -51,10 +51,7 @@ new_gt_imgs_fortrain=Data_processing.croped_img(gt_imgs_fortrain)
 
 
 
-
 foreground_threshold = 0.25 
-
-
 
 
 #create training set
@@ -103,7 +100,6 @@ with torch.no_grad():
       out_image=out_image_batches[j]
       out_image=torch.argmax(out_image,dim=0)
       out_image=out_image.numpy()
-
       #输出out_imge中的最大值
       test_image=Y_batch[i][j].numpy()
       gt = test_image
@@ -125,7 +121,6 @@ out_image = out_image.astype(np.uint8)  # 转换为uint8类型
 plt.imsave("training/groundtruth/satImage_001_01.png", out_image, cmap="gray")
             
             
-
 
 image_dir="test_set_images/"
 files = os.listdir(image_dir)

@@ -405,7 +405,7 @@ class FCN8sPatchClassifier_complex(nn.Module):
 
         return output
 
-def train_fcn8s_patch(X_batch, Y_batch, num_epochs=4):
+def train_fcn8s_patch(X_batch, Y_batch, num_epochs=6):
     model = FCN8sPatchClassifier_complex()
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)

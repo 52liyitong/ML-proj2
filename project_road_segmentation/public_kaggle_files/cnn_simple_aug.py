@@ -71,7 +71,7 @@ X=img_patches
 Y=gt_patches
 #here we randomly choose 100 patches to do data_augmentation
 #index list
-index_list=np.random.choice(len(X),size=2000,replace=False)
+index_list=np.random.choice(len(X),size=100,replace=False)
 X_list = X.tolist()  # 转换为列表
 gt_patches_list = Y.tolist()  # 转换为列表
 for i in index_list:

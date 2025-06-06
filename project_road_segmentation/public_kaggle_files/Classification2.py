@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class FCN8sPatchClassifier_stride16(nn.Module):
+class FCN8sPatchClassifier_stride16_simple(nn.Module):
     def __init__(self):
-        super(FCN8sPatchClassifier_stride16, self).__init__()
+        super(FCN8sPatchClassifier_stride16_simple, self).__init__()
 
         # 使用 stride=16 的第一层卷积
         self.init_conv = nn.Conv2d(3, 64, kernel_size=3, stride=16, padding=1)  # (608,608) → (38,38)
@@ -31,8 +31,8 @@ class FCN8sPatchClassifier_stride16(nn.Module):
         out = self.conv_block(x)  # → (B, 2, 38, 38)
         return out
 
-def train_fcn8s_patch(X_batch, Y_batch, num_epochs=4):
-    model = FCN8sPatchClassifier_stride16()
+def train_fcn8s_patch_stride16_simple(X_batch, Y_batch, num_epochs=4):
+    model = FCN8sPatchClassifier_stride16_simple()
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
@@ -54,123 +54,87 @@ def train_fcn8s_patch(X_batch, Y_batch, num_epochs=4):
 
     return model
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
-class FCN8sPatchClassifier_deep(nn.Module):
+
+class FCN8sPatchClassifier_stride16(nn.Module):
     def __init__(self):
-        super(FCN8sPatchClassifier_deep, self).__init__()
+        super(FCN8sPatchClassifier_stride16, self).__init__()
 
-        # Block 1
-        self.block1 = nn.Sequential(
-            nn.Conv2d(3, 64, 3, padding=1),
+        # Step-down convolution: directly downsample 608→38
+        self.initial = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=3, stride=16, padding=1),  # 608→38
             nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.Conv2d(64, 64, 3, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.MaxPool2d(2, stride=2)  # 608 → 304
+            nn.ReLU()
         )
-        # Block 2
-        self.block2 = nn.Sequential(
-            nn.Conv2d(64, 128, 3, padding=1),
+
+        # Deep feature extraction (remain at 38×38)
+        self.backbone = nn.Sequential(
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(),
-            nn.Conv2d(128, 128, 3, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
-            nn.MaxPool2d(2, stride=2)  # 304 → 152
-        )
-        # Block 3
-        self.block3 = nn.Sequential(
-            nn.Conv2d(128, 256, 3, padding=1),
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(),
-            nn.Conv2d(256, 256, 3, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(),
-            nn.Conv2d(256, 256, 3, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(),
-            nn.MaxPool2d(2, stride=2)  # 152 → 76
-        )
-        # Block 4
-        self.block4 = nn.Sequential(
-            nn.Conv2d(256, 512, 3, padding=1),
+            nn.Conv2d(256, 512, kernel_size=3, padding=1),
             nn.BatchNorm2d(512),
-            nn.ReLU(),
-            nn.Conv2d(512, 512, 3, padding=1),
-            nn.BatchNorm2d(512),
-            nn.ReLU(),
-            nn.Conv2d(512, 512, 3, padding=1),
-            nn.BatchNorm2d(512),
-            nn.ReLU(),
-            nn.MaxPool2d(2, stride=2)  # 76 → 38
-        )
-        # Block 5
-        self.block5 = nn.Sequential(
-            nn.Conv2d(512, 512, 3, padding=1),
-            nn.BatchNorm2d(512),
-            nn.ReLU(),
-            nn.Conv2d(512, 512, 3, padding=1),
-            nn.BatchNorm2d(512),
-            nn.ReLU(),
-            nn.Conv2d(512, 512, 3, padding=1),
-            nn.BatchNorm2d(512),
-            nn.ReLU(),
-            nn.MaxPool2d(2, stride=2)  # 38 → 19
+            nn.ReLU()
         )
 
         # Classifier
         self.classifier = nn.Sequential(
-            nn.Conv2d(512, 4096, 7, padding=3),  # 19×19
+            nn.Conv2d(512, 256, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.Dropout2d(),
-            nn.Conv2d(4096, 4096, 1),
-            nn.ReLU(),
-            nn.Dropout2d(),
-            nn.Conv2d(4096, 2, 1)  # 输出通道 = 类别数
+            nn.Conv2d(256, 2, kernel_size=1)
         )
 
-        # Skip score layers
-        self.score_pool4 = nn.Conv2d(512, 2, 1)
-        self.score_pool3 = nn.Conv2d(256, 2, 1)
+        # Skip layers for downsampled inputs
+        self.skip76 = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(64, 2, kernel_size=1)
+        )
+        self.skip152 = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(64, 2, kernel_size=1)
+        )
 
-        # Upsample layers
-        self.upscore2 = nn.ConvTranspose2d(2, 2, kernel_size=4, stride=2, padding=1, bias=False)  # 19 → 38
-        self.upscore4 = nn.ConvTranspose2d(2, 2, kernel_size=4, stride=2, padding=1, bias=False)  # 38 → 76
-        self.upscore8 = nn.ConvTranspose2d(2, 2, kernel_size=4, stride=2, padding=1, bias=False)  # 76 → 152
+        # Upsampling and fusion
+        self.upscore_from_38 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)   # 38→76
+        self.upscore_from_76 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)   # 76→152
+        self.upscore_from_152 = nn.Upsample(scale_factor=4, mode='bilinear', align_corners=False)  # 152→608
 
-        # Final upsampling to 38×38
-        self.up_to_38 = nn.ConvTranspose2d(2, 2, kernel_size=16, stride=4, padding=6, bias=False)  # 152 → 608 → pool
 
     def forward(self, x):
         x = x.permute(0, 3, 1, 2)  # (B, 3, 608, 608)
-        x1 = self.block1(x)  # 304
-        x2 = self.block2(x1)  # 152
-        x3 = self.block3(x2)  # 76
-        x4 = self.block4(x3)  # 38
-        x5 = self.block5(x4)  # 19
 
-        score = self.classifier(x5)  # (B, 2, 19, 19)
-        score = self.upscore2(score)  # (B, 2, 38, 38)
+        # Downsample input manually for skip connections
+        x_76 = F.interpolate(x, size=(76, 76), mode='bilinear', align_corners=False)
+        x_152 = F.interpolate(x, size=(152, 152), mode='bilinear', align_corners=False)
 
-        score4 = self.score_pool4(x4)  # (B, 2, 38, 38)
-        score = score + score4
+        # Stride-16 encoding
+        x_init = self.initial(x)       # (B, 64, 38, 38)
+        x_feat = self.backbone(x_init) # (B, 512, 38, 38)
+        out = self.classifier(x_feat)  # (B, 2, 38, 38)
 
-        score = self.upscore4(score)  # (B, 2, 76, 76)
-        score3 = self.score_pool3(x3)  # (B, 2, 76, 76)
-        score = score + score3
+        # Skip connection fusion
+        up_38 = self.upscore_from_38(out)                     # → 76×76
+        skip_76 = self.skip76(x_76)                           # (B, 2, 76, 76)
+        fuse_76 = up_38 + skip_76
 
-        score = self.upscore8(score)  # (B, 2, 152, 152)
-        score = self.up_to_38(score)  # (B, 2, 608, 608) → 再平均池化
-        out = F.adaptive_avg_pool2d(score, (38, 38))  # → (B, 2, 38, 38)
+        up_76 = self.upscore_from_76(fuse_76)                # → 152×152
+        skip_152 = self.skip152(x_152)                       # (B, 2, 152, 152)
+        fuse_152 = up_76 + skip_152
 
-        return out
+        up_final = self.upscore_from_152(fuse_152)           # → 608×608
 
-def train_fcn8s_patch_deep(X_batch, Y_batch, num_epochs=6):
-    model = FCN8sPatchClassifier_deep()
+        final_out = F.adaptive_avg_pool2d(up_final, (38, 38))  # (B, 2, 38, 38)
+        return final_out
+
+
+def train_fcn8s_patch_stride16_complex(X_batch, Y_batch, num_epochs=6):
+    model = FCN8sPatchClassifier_stride16()
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
