@@ -11,7 +11,7 @@ root_dir = "training1/"
 image_dir = root_dir + "images/"
 files = os.listdir(image_dir)
 #randomly split the data into training set and test set
-n =40
+n =100
 train_index = np.random.choice(n, size=int(n*0.8), replace=False)
 test_index = np.setdiff1d(np.arange(n), train_index)
 

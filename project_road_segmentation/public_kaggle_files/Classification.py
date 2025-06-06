@@ -427,3 +427,5 @@ def train_fcn8s_patch(X_batch, Y_batch, num_epochs=4):
         print(f"Epoch {epoch+1}/{num_epochs}, Loss: {total_loss:.4f}")
 
     return model
+
+

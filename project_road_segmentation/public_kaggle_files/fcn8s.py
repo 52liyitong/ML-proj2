@@ -11,7 +11,7 @@ root_dir = "training1/"
 image_dir = root_dir + "images/"
 files = os.listdir(image_dir)
 #randomly split the data into training set and test set
-n =60
+n =100
 train_index = np.random.choice(n, size=int(n*0.8), replace=False)
 test_index = np.setdiff1d(np.arange(n), train_index)
 
@@ -26,6 +26,23 @@ gt_dir = root_dir + "groundtruth/"
 gt_imgs = [Data_processing.load_image(gt_dir + files[i]) for i in train_index]
 gt_imgs_fortrain = [Data_processing.load_image(gt_dir + files[i]) for i in test_index]
 
+index_list=np.random.choice(len(train_index),size=int(len(train_index)*0.1),replace=False)
+for i in index_list:
+  img=Data_processing.load_image(image_dir + files[train_index[i]])
+  z=np.random.rand()
+  if z<0.8:
+    img=Data_processing.mirror_image(img)
+    imgs.append(img)
+    gt_img=Data_processing.load_image(gt_dir + files[train_index[i]])
+    gt_img=Data_processing.mirror_image(gt_img)
+    gt_imgs.append(gt_img)
+  else:
+    img=Data_processing.rotate_image(img)
+    imgs.append(img)
+    gt_img=Data_processing.load_image(gt_dir + files[train_index[i]])
+    gt_img=Data_processing.rotate_image(gt_img)
+    gt_imgs.append(gt_img)
+print(len(imgs))
 
 #for all imgs,normalize them
 
