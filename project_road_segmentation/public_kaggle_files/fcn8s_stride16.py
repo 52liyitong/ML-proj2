@@ -90,20 +90,30 @@ Y_batch=torch.from_numpy(Y_batch).long()
 total=0
 count=0
 with torch.no_grad():
-   for i in range(len(X_batch)):
-    out_image_batches=model(X_batch[i])
+  mlou_total = 0
+  for i in range(len(X_batch)):
+    out_image_batches = model(X_batch[i])
     for j in range(len(out_image_batches)):
-      out_image=out_image_batches[j]
-      out_image=torch.argmax(out_image,dim=0)
-      out_image=out_image.numpy()
-      #输出out_imge中的最大值
-      test_image=Y_batch[i][j].numpy()
+      out_image = out_image_batches[j]
+      out_image = torch.argmax(out_image, dim=0)
+      out_image = out_image.numpy()
+      test_image = Y_batch[i][j].numpy()
       gt = test_image
       acc = np.mean(out_image == gt)
       total += acc
+      # mIoU calculation
+      intersection = np.logical_and(out_image == 1, gt == 1).sum()
+      union = np.logical_or(out_image == 1, gt == 1).sum()
+      if union == 0:
+        iou = 1.0 if intersection == 0 else 0.0
+      else:
+        iou = intersection / union
+      mlou_total += iou
       count += 1
-total/=count
-print("Accuracy: ",total)
+total /= count
+mlou = mlou_total / count
+print("Accuracy: ", total)
+print("mIoU: ", mlou)
 
 img1=imgs[1]
 img1=torch.from_numpy(img1).float()

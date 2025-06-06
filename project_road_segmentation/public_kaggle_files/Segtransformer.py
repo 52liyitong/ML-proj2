@@ -98,24 +98,33 @@ total = 0.0
 count = 0
 
 with torch.no_grad():
-    model.eval()
-    for i in range(len(X_batch)):
-        imgs = X_batch[i].permute(0, 3, 1, 2)  # [B, C, H, W]
-        out = model(pixel_values=imgs)
-        logits = out.logits  # [B, C, H, W]
+  model.eval()
+  iou_total = 0.0
+  for i in range(len(X_batch)):
+    imgs = X_batch[i].permute(0, 3, 1, 2)  # [B, C, H, W]
+    out = model(pixel_values=imgs)
+    logits = out.logits  # [B, C, H, W]
 
-        for j in range(logits.shape[0]):
-            out_image = logits[j]  # [C, H, W]
-            out_image = torch.argmax(out_image, dim=0)  # [H, W]
+    for j in range(logits.shape[0]):
+      out_image = logits[j]  # [C, H, W]
+      out_image = torch.argmax(out_image, dim=0)  # [H, W]
 
-            out_image = out_image.cpu().numpy()
-            gt = Y_batch[i][j].squeeze(0).cpu().numpy()  # [H, W]
-            acc = np.mean(out_image == gt)
-            total += acc
-            count += 1
+      out_image_np = out_image.cpu().numpy()
+      gt = Y_batch[i][j].squeeze(0).cpu().numpy()  # [H, W]
+      acc = np.mean(out_image_np == gt)
+      total += acc
+      count += 1
+
+      # MIoU calculation (for binary segmentation: 0-background, 1-foreground)
+      intersection = np.logical_and(out_image_np == 1, gt == 1).sum()
+      union = np.logical_or(out_image_np == 1, gt == 1).sum()
+      iou = intersection / union if union != 0 else 1.0
+      iou_total += iou
 
 total /= count
+miou = iou_total / count
 print("Accuracy:", total)
+print("MIoU:", miou)
 
 
             
@@ -124,7 +133,7 @@ print("Accuracy:", total)
 image_dir="test_set_images/"
 files = os.listdir(image_dir)
 with torch.no_grad():
- with open("submission6.csv", "w") as f:
+ with open("submission7.csv", "w") as f:
   f.writelines("id,prediction\n")
   num_files=len(files)
   for i in range(num_files):

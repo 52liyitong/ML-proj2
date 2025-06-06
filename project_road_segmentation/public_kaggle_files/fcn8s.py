@@ -94,38 +94,42 @@ Y_batch=torch.from_numpy(Y_batch).long()
 total=0
 count=0
 with torch.no_grad():
-   for i in range(len(X_batch)):
-    out_image_batches=model(X_batch[i])
+  intersection = 0
+  union = 0
+  for i in range(len(X_batch)):
+    out_image_batches = model(X_batch[i])
     for j in range(len(out_image_batches)):
-      out_image=out_image_batches[j]
-      out_image=torch.argmax(out_image,dim=0)
-      out_image=out_image.numpy()
-      #输出out_imge中的最大值
-      test_image=Y_batch[i][j].numpy()
+      out_image = out_image_batches[j]
+      out_image = torch.argmax(out_image, dim=0)
+      out_image = out_image.numpy()
+
+      test_image = Y_batch[i][j].numpy()
       gt = test_image
       acc = np.mean(out_image == gt)
       total += acc
       count += 1
-total/=count
-print("Accuracy: ",total)
 
-img1=imgs[1]
-img1=torch.from_numpy(img1).float()
-img1=img1.unsqueeze(0)
-out_image=model(img1)
-out_image=torch.argmax(out_image,dim=1)
-out_image=out_image.squeeze(0)
-out_image=out_image.numpy()
-# 确保图像是2D数组
-out_image = out_image.astype(np.uint8)  # 转换为uint8类型
-plt.imsave("training/groundtruth/satImage_001_01.png", out_image, cmap="gray")
+      # MIoU calculation
+      inter = np.logical_and(out_image == 1, gt == 1).sum()
+      uni = np.logical_or(out_image == 1, gt == 1).sum()
+      intersection += inter
+      union += uni
+
+total /= count
+print("Accuracy: ", total)
+if union > 0:
+  miou = intersection / union
+else:
+  miou = 0.0
+print("MIoU: ", miou)
+
             
             
 
 image_dir="test_set_images/"
 files = os.listdir(image_dir)
 with torch.no_grad():
- with open("submission6.csv", "w") as f:
+ with open("submission4.csv", "w") as f:
   f.writelines("id,prediction\n")
   num_files=len(files)
   for i in range(num_files):
