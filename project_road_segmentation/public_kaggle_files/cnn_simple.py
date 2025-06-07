@@ -6,11 +6,12 @@ from PIL import Image
 import Data_processing
 import Classification
 import torch
-#linear_regression and CNN
+from sklearn.metrics import jaccard_score
+
 root_dir = "training/"
 image_dir = root_dir + "images/"
 files = os.listdir(image_dir)
-#randomly split the data into training set and test set
+
 n = len(files)
 train_index = np.random.choice(n, size=int(n*0.8), replace=False)
 test_index = np.setdiff1d(np.arange(n), train_index)
@@ -61,17 +62,31 @@ gt_patches1=np.asarray(
 
 foreground_threshold = 0.25 
 #create training set
-#case2: CNN
-#we need to load the data again
-
+X = []
+Y = []
 batch_size=50
 X=img_patches
 Y=gt_patches
+#here we randomly choose 100 patches to do data_augmentation
 
+
+##########################
+##data augmentation here##
+##########################
+
+#if you want to do data augmentation, you can change the size of index_list
+
+index_list=np.random.choice(len(X),size=0,replace=False)
+X_list = X.tolist() 
+gt_patches_list = Y.tolist() 
+for i in index_list:
+    X_list.append(Data_processing.image_crop_with_data_augmentation(X[i]))
+    gt_patches_list.append(Y[i])
+X = np.array(X_list)  
+Y = np.array(gt_patches_list) 
 #convert Y to 0,1 matrix
 foreground_threshold = 0.25 
-Y=np.asarray([Data_processing.value_to_class(np.mean(gt_patches[i]),foreground_threshold) for i in range(len(gt_patches))])
-
+Y=np.asarray([Data_processing.value_to_class(np.mean(gt_patches_list[i]),foreground_threshold) for i in range(len(gt_patches_list))])
 #batch the data
 X_batch=[]
 Y_batch=[]
@@ -84,13 +99,12 @@ Y_batch=np.asarray(Y_batch)
 X_batch=torch.from_numpy(X_batch).float()
 Y_batch=torch.from_numpy(Y_batch).long()
 model=Classification.train_CNN(X_batch,Y_batch)
-print("model trained")
 #accuracy
 avg_acc=0
+
 X=img_patches1
 Y=gt_patches1
 Y=np.asarray([Data_processing.value_to_class(np.mean(gt_patches1[i]),foreground_threshold) for i in range(len(gt_patches1))])
-#how many 1s and 0s
 num_positive=np.sum(Y==1)
 num_negative=np.sum(Y==0)
 total_num=len(Y)
@@ -109,14 +123,24 @@ Y_batch=torch.from_numpy(Y_batch).long()
 total=0
 count=0
 with torch.no_grad():
-  for i in range(len(X_batch)):
-    output=model(X_batch[i])
-    pred=torch.argmax(output,axis=1)
-    acc=torch.sum(pred==Y_batch[i]).item()/len(Y_batch[i])
-    total+=acc
-    count+=1
-total/=count
-print("Accuracy: ",total)
+    miou_total = 0
+    for i in range(len(X_batch)):
+        output = model(X_batch[i])
+        pred = torch.argmax(output, axis=1)
+        acc = torch.sum(pred == Y_batch[i]).item() / len(Y_batch[i])
+        total += acc
+        count += 1
+
+        # MIoU calculation
+        pred_np = pred.cpu().numpy().flatten()
+        y_true_np = Y_batch[i].cpu().numpy().flatten()
+        miou = jaccard_score(y_true_np, pred_np, average='macro')
+        miou_total += miou
+
+total /= count
+miou_total /= count
+print("Accuracy: ", total)
+print("MIoU: ", miou_total)
 test_set_images = os.listdir("test_set_images/")
 #create a submission.csv file
 with open("submission2.csv", "w") as f:
@@ -136,6 +160,12 @@ with open("submission2.csv", "w") as f:
     plt.imsave("test_set_images/" + file_name + "_result2.png", Z,cmap="gray")
     plt.imsave("test_set_images/" + file_name + "combained_result2.png", new_img, cmap="gray")
     f.writelines("{}\n".format(s) for s in Data_processing.mask_to_submission_strings("test_set_images/" + file_name + "_result2.png"))
+
+
+
+
+
+
 
 
 

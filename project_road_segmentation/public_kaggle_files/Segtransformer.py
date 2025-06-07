@@ -25,7 +25,10 @@ gt_dir = root_dir + "groundtruth/"
 gt_imgs = [Data_processing.load_image(gt_dir + files[i]) for i in train_index]
 gt_imgs_fortrain = [Data_processing.load_image(gt_dir + files[i]) for i in test_index]
 
-#data augmentation
+##########################
+##data augmentation here##
+##########################
+#if you want to do data augmentation, you can change the size of index_list,in our experiment, we set it to 0.1*len(train_index)
 index_list=np.random.choice(len(train_index),size=int(len(train_index)*0),replace=False)
 for i in index_list:
   img=Data_processing.load_image(image_dir + files[train_index[i]])

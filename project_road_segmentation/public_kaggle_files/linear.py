@@ -71,7 +71,7 @@ X_batch = np.vstack(X)
 Y_batch = np.concatenate(Y) 
 #case1: logistic regression
 logreg = Classification.logistic_regression(X_batch,Y_batch)
-avg_acc=0;
+avg_acc=0
 for i in test_index:
  Xi = Data_processing.extract_img_features_2d(image_dir + files[i], patch_size)
  Zi = logreg.predict(Xi)
@@ -99,7 +99,7 @@ with open("submission1.csv", "w") as f:
     Z=Data_processing.label_to_img(38*16,38*16,16,16,Z)
     new_img=Data_processing.make_img_overlay(img,Z)
     plt.imsave("test_set_images/" + file_name + "_result1.png", Z,cmap="gray")
-    plt.imsave("test_set_images/" + file_name + "combained_result1.png", new_img, cmap="gray")
+    plt.imsave("test_set_images/" + file_name + "_combined_result1.png", new_img, cmap="gray")
     f.writelines("{}\n".format(s) for s in Data_processing.mask_to_submission_strings("test_set_images/" + file_name + "_result1.png"))
   
   

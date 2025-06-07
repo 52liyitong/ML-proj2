@@ -151,6 +151,6 @@ with torch.no_grad():
         new_out_image[i*16:(i+1)*16,j*16:(j+1)*16]=out_image[i,j]
     out_image=new_out_image
     
-    plt.imsave("test_set_images/" + file_name + file_name2 + "_result6.png", out_image,cmap="gray")
-    f.writelines("{}\n".format(s) for s in Data_processing.mask_to_submission_strings("test_set_images/" + file_name + file_name2 + "_result6.png"))
+    plt.imsave("test_set_images/" + file_name + file_name2 + "_result5.png", out_image,cmap="gray")
+    f.writelines("{}\n".format(s) for s in Data_processing.mask_to_submission_strings("test_set_images/" + file_name + file_name2 + "_result5.png"))
 
